@@ -1,0 +1,294 @@
+ClearText()
+Print("MackOS v0.2a")
+Print("")
+Info()
+Print("")
+Main()
+
+array Init()
+	string inputString = ""
+	if (GetUser() == "Sebastian")
+		inputString = "#:> "
+	else
+		inputString = ":> "
+	end
+	return [inputString]
+end
+
+void Main()
+	array initVars = []
+	string cmd = ""
+	initVars = Init()
+	array argv = []
+	loop	
+		array args = []
+		string inputString = Input(initVars[0])
+		argv = Split(inputString, " ", 0)
+		cmd = argv[0]
+		if (Count(argv) > 1)
+			loop i from 1 to Count(argv) - 1
+				Append(args, argv[i])
+			end
+		end
+		Dispatch(cmd, args)
+	end
+end
+
+void Dispatch(string cmd, array args)
+ string cmpCmd = ToUpper(cmd)
+	if (cmpCmd == "INFO")
+		Info()
+	 return
+ else if (cmpCmd == "CLS" or cmpCmd == "CLR" or cmpCmd == "CLEAR")
+  ClearText()
+  return
+	else if (cmpCmd == "CONS")
+  PrintConnections()
+ else if (cmpCmd == "CON")
+  if !Count(args) > 0
+      Print("No target specified")
+      return
+  end
+  number id = Connect(args[0])
+  if id < 0
+      Print("Connection failure")
+  else
+      Print(args[0] + " connected at " + id)
+  end
+ else if (cmpCmd == "CRAWL")
+  Crawl()
+ else if (cmpCmd == "RFC")
+  RFC()
+ else if (cmpCmd == "DISCONNECT")
+  DisconnectAll()
+	else
+		Print("Unknown Command: " + cmd)
+		return
+	end
+end
+
+bool InArray(string search, array input)
+ loop i from 0 to Count(input) - 1
+  if (input[i] == search)
+   return true
+  end
+ end
+ return false
+end
+
+string StrReplace(string fromStr, string toStr, string str)
+	number strLength = Count(str)
+	number searchLength = Count(fromStr)
+	number replaceLength = Count(toStr)
+	
+	if (searchLength > strLength)
+		return str
+	end
+	
+	string result = ""
+	number currPos = 0
+	
+	loop
+		if (currPos >= strLength)
+			return result
+		end
+		number tokenPos = StringPos(fromStr, str, currPos)
+		if (tokenPos > -1)
+			result += SubString(str, currPos, tokenPos - currPos - 1)
+			result += toStr
+			result += SubString(str, tokenPos + replaceLength, strLength)
+		else
+			return result
+		end
+	end
+end
+
+array Split(string str, string delim, number limit)
+	number strLength = Count(str)
+	number delLength = Count(delim)
+	if (strLength < delLength)
+     	return []
+	end
+		array result = []
+		string curToken = ""
+		number curPos = 0
+		number tokens = 0
+		number len = 0
+		number delPos = -1
+		loop
+			if (curPos >= strLength)
+				return result
+			end
+
+			delPos = StringPos(delim, str, curPos)
+			if !(delPos == -1)
+				len = delPos - curPos
+				if (len < 0)
+					len = 0
+				end
+				curToken = SubString(str, curPos, len)
+				Append(result, curToken)
+				curPos = delPos + 1
+			else
+			         Append(result, SubString(str, curPos, -1))
+			         break
+			end
+		end
+	return result
+end
+
+string SubString(string str, number start, number len)
+	number strLen = Count(str)
+	if ((start + len > strLen - 1) or (len == -1))
+    len = (strLen - start)
+	end
+	string result = ""
+	loop i from start to (start + len - 1)
+    result += str[i]
+	end
+	return result
+end
+
+number StringPos(string string1, string string2, number startPos)
+	number stringLength = Count(string2)
+	number subStringLength = Count(string1)
+	
+	if ((stringLength <= startPos) or (subStringLength > stringLength))
+		return -1
+	end
+	
+	bool found = false
+	number count = 0
+	loop i from startPos to (stringLength - 1)
+		if (string2[i] == string1[count])
+			count += 1
+			found = true
+		else
+			count = 0
+			found = false
+		end
+		if (found and (count == subStringLength))
+			return i - (count - 1)
+		end
+	end
+	return -1
+end
+
+string ToUpper(string input)
+   string result = ""
+   loop c in input
+       if IsLower(c)
+           result += IntToChar(CharToInt(c) - 32)
+       else
+           result += c
+       end
+   end
+   return result     
+end
+
+bool IsLower(var c)
+    return CharToInt(c) >= 0 && CharToInt(c) <= 25    
+end
+
+void PrintConnections()
+   array conn = GetConnections()
+   if (Count(conn) > 0)
+       Print("Current Connections: ")
+       loop c in conn
+           Print(c)
+       end
+   else
+       Print("No connections are established.")
+   end
+end
+
+array GetConFromHost(var server)
+   array results = []
+   results = server.GetConnections()
+   return results
+end
+
+void Crawl()
+   array conns = GetConnections()
+   number curCon = 0
+   loop
+       DisconnectAll()
+       number oldCon = Count(conns)
+       loop i from curCon to Count(conns) - 1
+          var serv = Connect(conns[i])
+          if !(serv == -1)
+              array newConns = GetConFromHost(serv)
+              loop new in newConns
+                 if !(InArray(new, conns))
+                     Append(conns, new)
+                 end
+             end
+             curCon += 1
+          end
+       end
+       number newCon = Count(conns)
+       if (newCon == oldCon)
+           loop conns
+               Print(@)
+           end
+           break
+       end
+   end
+end
+
+void List(array input)
+   loop item in input
+       Print(item)
+   end 
+end
+
+void RFC()
+	number count = 0
+ number input = -1
+ var conns = GetConnections()
+ if Count(conns) > 1
+	    loop c in conns
+    		count += 1
+    		Print(count + " " + c)
+    	end
+    	input = Input("Which connection would you like to run on? ") - 1
+ else if Count(conns) == 1
+     input = 0
+ else
+     Print("No active connections.")
+     return
+ end
+	var FuncName = Input("What function would you like to run? ")
+ if !(RemoteFunctionCall(input, "HasFunction", FuncName))
+     Print("Function does not exist on remote host")
+     return
+ end
+	array arguments = Tokenize(Input("Arguments? "), " ")
+	var result = RemoteFunctionCall(input, FuncName, arguments)
+ if !Type(result) == "unknown"
+     Print(result)
+ end
+end
+
+void ListCommands()
+   # ToDo 
+end
+
+array Tokenize(string str, var delim)
+	number processedLen = 0
+	number inputLen = Count(str)
+	array res = []
+	var token = ""
+	loop char in str
+		if(CharToInt(char) != CharToInt(delim))
+			token += char
+			processedLen += 1
+		end
+		if(CharToInt(char) == CharToInt(delim) or processedLen == inputLen) 
+			Append(res, token)
+			token = ""
+			processedLen += 1
+		end
+	end
+	return res
+end
