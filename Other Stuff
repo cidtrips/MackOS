@@ -1,0 +1,211 @@
+ClearText()
+Print("MackOS v0.2b")
+Print("")
+Info()
+Print("")
+Main()
+
+array Init()
+	string inputString = ""
+	if (GetUser() == "Sebastian")
+		inputString = "#:> "
+	else
+		inputString = ":> "
+	end
+	return [inputString]
+end
+
+void Main()
+	array initVars = []
+	string cmd = ""
+	initVars = Init()
+	array argv = []
+	loop	
+		array args = []
+		string inputString = Input(initVars[0])
+		argv = Split(inputString, " ")
+		cmd = argv[0]
+		if (Count(argv) > 1)
+			loop i from 1 to Count(argv) - 1
+				Append(args, argv[i])
+			end
+		end
+		Print(Dispatch(cmd, args))
+	end
+end
+
+var Dispatch(string cmd, array args)
+	var host
+	if Name() == "MainFrame"
+		Print("Not designed to work from MainFrame")
+		return
+	end
+	host = GetConnection("MainFrame")
+	# Check if host is connected to us...
+	var local = GetRemoteConnection(host, Name())
+	Print("Running Remote Function " + cmd + " with args:")
+	Print(args)
+	var result = host.RemoteFunctionCall(local, cmd, args)
+	Print("Returning result")
+	return result
+end
+
+number GetRemoteConnection(var host, string connection)
+	number id = -1
+	loop host.GetConnections()
+		id += 1
+		if @ == connection
+			return id
+		end
+	end
+	return host.Connect(connection)
+end
+
+number GetConnection(string host)
+    number id = -1
+    loop GetConnections()
+        id += 1
+        if @ == host
+            return id
+        end
+    end
+    return Connect(host)
+end
+
+bool InArray(string search, array input)
+ loop i from 0 to Count(input) - 1
+  if (input[i] == search)
+   return true
+  end
+ end
+ return false
+end
+
+string StrReplace(string fromStr, string toStr, string str)
+	number strLength = Count(str)
+	number searchLength = Count(fromStr)
+	number replaceLength = Count(toStr)
+	
+	if (searchLength > strLength)
+		return str
+	end
+	
+	string result = ""
+	number currPos = 0
+	
+	loop
+		if (currPos >= strLength)
+			return result
+		end
+		number tokenPos = StringPos(fromStr, str, currPos)
+		if (tokenPos > -1)
+			result += SubString(str, currPos, tokenPos - currPos - 1)
+			result += toStr
+			result += SubString(str, tokenPos + replaceLength, strLength)
+		else
+			return result
+		end
+	end
+end
+
+string SubString(string str, number start, number len)
+	number strLen = Count(str)
+	if ((start + len > strLen - 1) or (len == -1))
+    len = (strLen - start)
+	end
+	string result = ""
+	loop i from start to (start + len - 1)
+    result += str[i]
+	end
+	return result
+end
+
+number StringPos(string string1, string string2, number startPos)
+	number stringLength = Count(string2)
+	number subStringLength = Count(string1)
+	
+	if ((stringLength <= startPos) or (subStringLength > stringLength))
+		return -1
+	end
+	
+	bool found = false
+	number count = 0
+	loop i from startPos to (stringLength - 1)
+		if (string2[i] == string1[count])
+			count += 1
+			found = true
+		else
+			count = 0
+			found = false
+		end
+		if (found and (count == subStringLength))
+			return i - (count - 1)
+		end
+	end
+	return -1
+end
+
+string ToUpper(string input)
+   string result = ""
+   loop c in input
+       if IsLower(c)
+           result += IntToChar(CharToInt(c) - 32)
+       else
+           result += c
+       end
+   end
+   return result     
+end
+
+bool IsLower(var c)
+    return CharToInt(c) >= 0 && CharToInt(c) <= 25    
+end
+
+void PrintConnections()
+   array conn = GetConnections()
+   if (Count(conn) > 0)
+       Print("Current Connections: ")
+       loop c in conn
+           Print(c)
+       end
+   else
+       Print("No connections are established.")
+   end
+end
+
+array GetConFromHost(var server)
+   array results = []
+   results = server.GetConnections()
+   return results
+end
+
+array Split(string str, var delim)
+	number processedLen = 0
+	number inputLen = Count(str)
+	array res = []
+	var token = ""
+	loop char in str
+		if(CharToInt(char) != CharToInt(delim))
+			token += char
+			processedLen += 1
+		end
+		if(CharToInt(char) == CharToInt(delim) or processedLen == inputLen) 
+			Append(res, token)
+			token = ""
+			processedLen += 1
+		end
+	end
+	return res
+end
+
+void List(string arg)
+   number id = GetConnection("MainFrame")
+   array args = []
+   Append(args, arg)
+   if !id > -1
+       id = Connect("MainFrame")
+   end 
+   loop RemoteFunctionCall(id, "GetThingsOfType", args)
+       Print(@)
+   end
+end
