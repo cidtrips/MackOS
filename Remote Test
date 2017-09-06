@@ -1,0 +1,110 @@
+number RemoteId
+string RemoteName
+	
+void Main(string remote)
+	setupRemote(remote)
+	string cmd = ""
+	array argv = []
+	loop
+		array args = []
+		string inputString = rInput("#:>")
+		argv = Split(inputString, " ")
+		cmd = argv[0]
+		if (Count(argv) > 1)
+			loop i from 1 to Count(argv) - 1
+				Append(args, argv[i])
+			end
+		end
+		rPrint(Dispatch(cmd, args))
+	end
+end
+
+void Dispatch(string cmd, array args)
+	string cmpCmd = ToUpper(cmd)
+	if (cmpCmd == "LS" || cmpCmd == "LIST")
+		if !Count(args) > 0
+			List("")
+		else
+			List(args[0])
+		end
+	else
+		Print("Unknown Command: " + cmd)
+		return
+	end
+end
+
+void setupRemote(string remote)
+	RemoteName = remote
+	RemoteId = GetConnection(remote)
+end
+
+void rPrint(string input)
+	array args = []
+	Append(args, input)
+	RemoteFunctionCall(RemoteId, "Print", args)
+	return
+end
+
+var rInput(string input)
+	array args = []
+	Append(args, input)
+	return RemoteFunctionCall(RemoteId, "Input", args)
+end
+
+number GetConnection(string host)
+    number id = -1
+    loop GetConnections()
+        id += 1
+        if @ == host
+            return id
+        end
+    end
+    return Connect(host)
+end
+
+void List(string arg)
+   number id = GetConnection("MainFrame")
+   array args = []
+   Append(args, arg)
+   if !id > -1
+       id = Connect("MainFrame")
+   end 
+   loop RemoteFunctionCall(id, "GetThingsOfType", args)
+       Print(@)
+   end
+end
+
+string ToUpper(string input)
+   string result = ""
+   loop c in input
+       if IsLower(c)
+           result += IntToChar(CharToInt(c) - 32)
+       else
+           result += c
+       end
+   end
+   return result     
+end
+
+bool IsLower(var c)
+    return CharToInt(c) >= 0 && CharToInt(c) <= 25    
+end
+
+array Split(string str, var delim)
+	number processedLen = 0
+	number inputLen = Count(str)
+	array res = []
+	var token = ""
+	loop char in str
+		if(CharToInt(char) != CharToInt(delim))
+			token += char
+			processedLen += 1
+		end
+		if(CharToInt(char) == CharToInt(delim) or processedLen == inputLen) 
+			Append(res, token)
+			token = ""
+			processedLen += 1
+		end
+	end
+	return res
+end
