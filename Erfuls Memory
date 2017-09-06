@@ -1,0 +1,87 @@
+
+# CHAR REFERENCE:
+# -64 !"#$%&'()*+,-./0123456789:;<=>?@ -65 -> SPACE " "
+# -32 ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_`  29 -> "~"
+#  0 abcdefghijklmnopqrstuvwxyz{|}~     -1,<65,>29 -> UNUSED
+
+# SPECIAL CHARS (only used by these functions)
+# 64 array
+
+void SaveMemoryPlus(string key, var value)
+    string type = Type(value)
+    if type == "array"
+        SaveMemoryArray(key, value)
+    else if type == "unknown"
+        # only "unknown" type known is automatic array index,
+        # so we cast it as number (if not, error)
+        number aux = value
+        SaveMemory(key, aux)
+    else
+        SaveMemory(key, value)
+    end
+end
+
+var LoadMemoryPlus(string key)
+    var value = LoadMemory(key)
+    if value == IntToChar(64)
+        return LoadMemoryArray(key)
+    else
+        return value
+    end
+end
+
+void EraseMemoryPlus(string key)
+    if HasMemory(key)
+        if LoadMemory(key) == IntToChar(64)
+            EraseMemoryArray(key)
+        else
+            EraseMemory(key)
+        end
+    end
+end
+
+void SaveMemoryArray(string key, array a)
+    EraseMemoryPlus(key)
+    string subKey = IntToChar(64) + key + IntToChar(64)
+    SaveMemory(key, IntToChar(64))
+    number i = 0
+    loop GetIndexes(a)
+        SaveMemoryPlus(subKey + "k" + i, @)
+        SaveMemoryPlus(subKey + "v" + i, a[@])
+        i++
+    end
+end
+
+array LoadMemoryArray(string key)
+    string subKey = IntToChar(64) + key + IntToChar(64)
+    array result = []
+    number i = 0
+    loop
+        if !HasMemory(subKey + "k" + i)
+            break
+        end
+        
+        # no need of LoadMemoryPlus 'cause key can't be array
+        var key = LoadMemory(subKey + "k" + i)
+        var value = LoadMemoryPlus(subKey + "v" + i)
+        
+        result[key] = value
+        i++
+    end
+    return result
+end
+
+void EraseMemoryArray(string key)
+    string subKey = IntToChar(64) + key + IntToChar(64)
+    number i = 0
+    loop
+        if !HasMemory(subKey + "k" + i)
+            break
+        end
+        
+        EraseMemory(subKey + "k" + i)
+        EraseMemoryPlus(subKey + "v" + i)
+
+        i++
+    end    
+end
