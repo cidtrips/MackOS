@@ -1,0 +1,401 @@
+# Globals
+##################################################
+
+# You may want to change this as it doesn't seem to work on all screen sizes
+var screenLines = Int(Height() / 19)
+bool gPeopleSorted = False
+array gPeople = []
+array gPeopleAsKeys = []
+
+# Program
+##################################################
+
+loop
+    Main()
+end
+
+# Control Functions
+##################################################
+
+void Main()
+    var actions = ["Find person", "Slurp"]
+    MergeSortString(actions)
+
+    array leadingText = ["Choose action", "-------------"]
+    string action = ScreenSelect(screenLines, leadingText, actions)
+    if action == "Find person"
+        FindPerson()
+    else if action == "Slurp"
+        PickSlurp()
+    end
+end
+
+var GetPeople(bool sortRequired)
+    if Count(gPeople) == 0
+        var s = PersonServer()
+        Print("Retrieving people...")
+        gPeople = s.GetPeople()
+    end
+    if sortRequired == True && gPeopleSorted == False
+        Print("Sorting people(" + Count(gPeople) + ")...")
+        MergeSortString(gPeople)
+        gPeopleSorted = True
+    end
+    return gPeople
+end
+
+var GetPeopleAsKeys()
+    if Count(gPeopleAsKeys) == 0
+        var people = GetPeople(False)
+        loop person in people
+            gPeopleAsKeys[person] = 1
+        end
+    end
+    return gPeopleAsKeys
+end
+
+var PersonServer()
+    # GetPeople :: [String]
+    # GetPosition :: String -> String
+    #    "ROOMNAME, coordinate: (X,Y)
+    # GetAction :: PersonName -> String
+    # GetRoom :: PersonName -> String
+    # GetThingsInRoom :: RoomName -> [String]
+    # GetAllRooms :: [String]
+    return Connect("PoliceOfficeInterior_MinistryOfficeWorkstationComputer_1")
+end
+
+void FindPerson()
+    var s = PersonServer()
+
+    array people = GetPeople(True)
+
+    string person = ScreenSelect(screenLines, LeadingText("People"), people)
+
+    array title = []
+
+    Append(title, "Person: " + person)
+    Append(title, "  " + s.GetPosition(person))
+    Append(title, "  Action: " + s.GetAction(person))
+    Append(title, DupString(Longest(title), "-"))
+
+    array actions = ["Restart", "Slurp to same room"]
+    string action = ScreenSelect(screenLines, title, actions)
+    if action == "Slurp to same room"
+        SlurpToRoom(s.GetRoom(person))
+    end
+end
+
+bool IsAllowedRoom(string room)
+    if (IsSuffixOf("_inventory", room))
+        return False
+    end
+    return True
+end
+
+void PickSlurp()
+    array areas = ["BarYvonne", "BurrowsApartments", "BurrowsNorth", "Casino", "DorisGardens", "Factory", "FinanceArea", "Foley", "HarborEast", "HarborNorth", "HarborSouth", "HarborWest", "Hotel", "Internet", "Mines", "Ministry", "PixiesApartment", "Plaza", "PoliceOffice", "PoorDesolateBuilding1", "ShoeStore", "SodaStorage", "TownHall", "YulianApartment"]
+
+    string area = ScreenSelect(screenLines, LeadingText("Choose area"), areas)
+    var s = PersonServer()
+    array rooms = s.GetAllRooms()
+    array selectRooms = []
+    loop room in rooms
+        if IsPrefixOf(area, room) && IsAllowedRoom(room)
+            Append(selectRooms, room)
+        end
+    end
+
+    string selectedRoom = selectRooms[0]
+    if(Count(selectRooms) > 1)
+        Print("Sorting rooms(" + Count(selectRooms) + ")...")
+        MergeSortString(selectRooms)
+        selectedRoom = ScreenSelect(screenLines, LeadingText("Choose room"), selectRooms)
+    end
+
+    SlurpToRoom(selectedRoom)
+    end
+
+void SlurpToRoom(string selectedRoom)
+    var s = PersonServer()
+
+    ClearText()
+    Print("Retrieving things for room " + selectedRoom)
+    array things = s.GetThingsInRoom(selectedRoom)
+
+    Print("Culling non-connectable items. (" + Count(things) + ")")
+    array connectableThings = []
+    loop thing in things
+        array peopleAsKeys = GetPeopleAsKeys()
+        if (Connect(thing)) && HasIndex(peopleAsKeys, thing) == False
+            Append(connectableThings, thing)
+        end
+    end
+
+    array thingsByPrefix = []
+    loop thing in connectableThings
+        thingsByPrefix[StripPrefix("____", StripPrefix(selectedRoom, thing))] = thing
+    end
+    array thingsByPrefixKeys = GetIndexes(thingsByPrefix)
+
+    if Count(thingsByPrefixKeys) > 75
+        Print("Skipping sort due to too many items! (" + Count(thingsByPrefixKeys)+ ")")
+    else
+        Print("Sorting things(" + Count(thingsByPrefixKeys) + ")...")
+        MergeSortString(thingsByPrefixKeys)
+    end
+
+    string selectedPrefix = ScreenSelect(screenLines, LeadingText("Choose thing in room"), thingsByPrefixKeys)
+    string selectedThing = thingsByPrefix[selectedPrefix]
+
+    DisconnectAll()
+    var server = Connect(selectedThing)
+    Slurp()
+end
+
+void ScreenSelect(number height, array niceLines, array values)
+    number niceLinesLength = Count(niceLines)
+    string selection
+    number currentPage = 0
+    array pages = PartitionBy(height - niceLinesLength, values)
+    number pagesLength = Count(pages)
+
+    loop
+        bool firstPage = currentPage == 0
+        bool lastPage = currentPage == pagesLength - 1
+        ClearText()
+        loop line in niceLines
+            Print(line)
+        end
+        array byLineNumber = []
+        var lineNumber = 1
+        loop line in pages[currentPage]
+            byLineNumber[lineNumber+""] = line
+            Print(lineNumber + ": " + line)
+            lineNumber += 1
+        end
+        selection = Input(FormatSelectionText(currentPage, pagesLength))
+        if (lastPage == True && selection == "")
+            currentPage = 0
+        else if ((selection == "" || selection == "n") && lastPage == False)
+            currentPage += 1
+        else if (firstPage == False && selection == "p")
+            currentPage -= 1
+        else if (HasIndex(byLineNumber, selection))
+            return byLineNumber[selection]
+        end
+    end
+end
+
+string FormatSelectionText(number currentPage, number pages)
+    bool firstPage = currentPage == 0
+    bool lastPage = currentPage == pages - 1
+    string pageDetail = "(" + (currentPage+1) + "/" + pages + ")"
+
+    if(pages == 1)
+      return "Selection: "
+    else if(firstPage)
+      return pageDetail + " #/n: "
+    else if(lastPage)
+      return pageDetail + " #/p: "
+    else
+      return pageDetail + " #/n/p: "
+    end
+end
+
+# Helper Functions
+##################################################
+
+void PartitionBy(number partionSize, array values)
+    array ret = []
+    array current = []
+    number currentSize = 0
+    loop val in values
+        currentSize = currentSize + 1
+        Append(current, val)
+
+        if(currentSize == partionSize)
+            Append(ret, current)
+            current = []
+            currentSize = 0
+        end
+    end
+
+    # Get last partition if not empty
+    if(Count(current) > 0)
+        Append(ret, current)
+    end
+
+    return ret
+end
+
+var ByIndex(array arr, number index)
+    number count = 0
+    loop x in arr
+        if(count == index)
+            return x
+        end
+        count = count + 1
+    end
+end
+
+# String Helper Functions
+##################################################
+
+string StripPrefix(string prefix, string str)
+    var pos = 0
+    loop c in prefix
+        if c != str[pos]
+            break
+        end
+        pos += 1
+    end
+    string ret = ""
+    loop i in Range(pos, Count(str) - 1)
+        ret += str
+    end
+    return ret
+end
+
+number CompareString(string a_, string b_)
+    string a = ToLowerCase(a_)
+    string b = ToLowerCase(b_)
+    var aLen = Count(a)
+    var bLen = Count(b)
+
+    var pos = 0
+    loop
+        if pos == aLen && pos == bLen
+            return 0
+        else if pos == aLen
+            return -1
+        else if pos == bLen
+            return 1
+        else
+            var diff = CharToInt(a[pos]) - CharToInt(b[pos])
+            if diff != 0
+                return diff
+            else
+                pos += 1
+            end
+        end
+    end
+end
+
+bool IsUpperCase(var c)
+  return CharToInt(c) >= -32 && CharToInt(c) <= -7
+end
+
+string ToLowerCase(var text)
+  string res = ""
+  loop c in text
+    if IsUpperCase(c)
+      res += IntToChar(CharToInt(c) + 32)
+    else
+      res += c
+    end
+  end
+  return res
+end
+
+string DupString(number times, string str)
+    string ret = ""
+    loop i from 1 to times
+        ret = ret + str
+    end
+    return ret
+end
+
+array LeadingText(string title)
+    return [title, DupString(Count(title), "-")]
+end
+
+number Longest(array arr)
+    var count = 0
+    loop str in arr
+        var strCount = Count(str)
+        if strCount > count
+            count = strCount
+        end
+    end
+    return count
+end
+
+bool IsPrefixOf(string prefix, string str)
+    var prefixSize = Count(prefix)
+    var strSize = Count(str)
+    if strSize < prefixSize
+        return False
+    end
+    var i = 0
+    loop c in prefix
+        if c != str
+            return False
+        end
+        i += 1
+    end
+    return True
+end
+
+bool IsSuffixOf(string suffix, string str)
+    var suffixSize = Count(suffix)
+    var strSize = Count(str)
+    if strSize < suffixSize
+        return False
+    end
+    var difference = strSize - suffixSize
+    var i = 0
+    loop c in suffix
+        if c != str[i+difference]
+            return False
+        end
+        i += 1
+    end
+    return True
+end
+
+# Sort Functions
+##################################################
+
+void MergeSortString(array arr)
+    array work = []
+    TopDownSplitMergeString(arr, 0, Count(arr), work)
+end
+
+void TopDownSplitMergeString(array a, number iBegin, number iEnd, array b)
+    if(iEnd - iBegin < 2)
+        return
+    end
+
+    number iMiddle = Int((iEnd + iBegin) / 2)
+    TopDownSplitMergeString(a, iBegin, iMiddle, b)
+    TopDownSplitMergeString(a, iMiddle, iEnd, b)
+    TopDownMergeString(a, iBegin, iMiddle, iEnd, b)
+    CopyArray(b, iBegin, iEnd, a)
+end
+
+void TopDownMergeString(array a, number iBegin, number iMiddle, number iEnd, array b)
+    var i0 = iBegin
+    var i1 = iMiddle
+
+    loop j from iBegin to (iEnd - 1)
+        # Why split this up?  "if" parameters are broken when this was written
+        var postCheck = i1 >= iEnd;
+        if postCheck == False
+            postCheck = CompareString(a[i0], a[i1]) < 1
+        end
+        if (i0 < iMiddle && postCheck)
+            b[j] = a[i0]
+            i0 += 1
+        else
+            b[j] = a[i1]
+            i1 += 1
+        end
+    end
+end
+
+void CopyArray(array b, number iBegin, number iEnd, array a)
+    loop k in Range(iBegin, iEnd - 1)
+        a[k] = b[k]
+    end
+end
