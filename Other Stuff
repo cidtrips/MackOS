@@ -30,46 +30,45 @@ void Main()
 				Append(args, argv[i])
 			end
 		end
-		Print(Dispatch(cmd, args))
+  Dispatch(cmd, args)
 	end
 end
 
 var Dispatch(string cmd, array args)
-	var host
-	if Name() == "MainFrame"
-		Print("Not designed to work from MainFrame")
-		return
-	end
-	host = GetConnection("MainFrame")
-	# Check if host is connected to us...
-	var local = GetRemoteConnection(host, Name())
-	Print("Running Remote Function " + cmd + " with args:")
-	Print(args)
-	var result = host.RemoteFunctionCall(local, cmd, args)
-	Print("Returning result")
-	return result
+ string cmp = ToLower(cmd)
+ if cmp == "cls" || cmp == "clr" || cmp == "clear"
+     ClearText()
+ else if cmp == "slurp"
+     Slurp()
+ else if cmp == "rfc"
+    Print(RFC(args))
+ else if cmp == "con"
+     if !Count(args) > 0
+         Print("No target specified")
+         return
+     end
+     Connect(args[0])
+ else if cmp == "disconnect"
+     DisconnectAll()
+ else if cmp == "test"
+     test()
+ else if cmp == "list" || cmp == "ls"
+     if !Count(args) > 0
+         Print("No qualifier for list.")
+         return
+     end
+     if args[0] == "con" || args[0] == "cons"
+         PrintConnections()
+         return
+     end
+     List(args[0])
+ else
+     Print("Command not found.")
+ end 
 end
 
 number GetRemoteConnection(var host, string connection)
-	number id = -1
-	loop host.GetConnections()
-		id += 1
-		if @ == connection
-			return id
-		end
-	end
 	return host.Connect(connection)
-end
-
-number GetConnection(string host)
-    number id = -1
-    loop GetConnections()
-        id += 1
-        if @ == host
-            return id
-        end
-    end
-    return Connect(host)
 end
 
 bool InArray(string search, array input)
@@ -79,6 +78,42 @@ bool InArray(string search, array input)
   end
  end
  return false
+#	var result = BinarySearch(input, 0, Count(input) - 1, search)
+#	if result == -1
+#		return false
+#	end
+#	return true
+end
+
+void Sort(array xs)
+    loop
+        bool didFlip = false
+        loop i from 0 to Count(xs) - 2
+            if xs[i] > xs[i + 1]
+                var temp = xs[i]
+                xs[i] = xs[i + 1]
+                xs[i + 1] = temp
+                didFlip = true
+            end
+        end
+        if didFlip == false
+            break
+        end
+    end
+end
+
+number BinarySearch(array input, number l, number r, var x)
+	if (r >= l)
+		number mid = l + Round((r - 1)/ 2)
+		if input[mid] == x
+			return mid
+		else if input[mid] > x
+			return BinarySearch(input, l, mid - 1, x)
+		else
+			return BinarySearch(input, mid + 1, r, x)
+		end
+	end
+	return -1
 end
 
 string StrReplace(string fromStr, string toStr, string str)
@@ -145,6 +180,18 @@ number StringPos(string string1, string string2, number startPos)
 	return -1
 end
 
+string ToLower(string input)
+    string result = ""
+    loop c in input
+        if IsLower(c)
+            result += c
+        else
+            result += IntToChar(CharToInt(c) + 32)
+        end
+    end
+    return result
+end
+
 string ToUpper(string input)
    string result = ""
    loop c in input
@@ -179,6 +226,11 @@ array GetConFromHost(var server)
    return results
 end
 
+bool InStr(string instr, string searchstr)
+    var stringy = Connect("Lodge_Entry_LargeRecorder_LargeRecorder_1")
+    return stringy.StringContains(instr, searchstr)
+end
+
 array Split(string str, var delim)
 	number processedLen = 0
 	number inputLen = Count(str)
@@ -199,13 +251,165 @@ array Split(string str, var delim)
 end
 
 void List(string arg)
-   number id = GetConnection("MainFrame")
    array args = []
+   array skip = []
+   bool saveRoom = false
+   array flopArgs = []
+   Append(flopArgs, "Floppy")
+   array Floppies = RemoteFunctionCall(Connect("MainFrame"), "GetThingsOfType", flopArgs)
+   Append(Floppies, "TrainingCube")
+   Append(Floppies, "Internet_Internet_MediumComputer_10")
+   Append(Floppies, "Internet_MediumComputer")
+   Append(Floppies, "ArcadeHall_ArcadeMachine_ArcadeMachine_3")
+   number roomNum = 0
+   if ToLower(arg) == "computer"
+       array computers = []
+       loop room in RemoteFunctionCall(Connect("MainFrame"), "GetAllRooms", [])
+           roomNum += 1
+           args = []
+           Append(args, room)
+           if !HasMemory("Room" + roomNum + "Computers")
+               saveRoom = true
+               loop item in RemoteFunctionCall(Connect("MainFrame"), "GetThingsInRoom", args)
+                   array temp = []
+                   Append(temp, "Info")
+                   if (!InArray(item, Floppies)) && (!InStr(item, "TerminalBoard")) && (!InStr(item, "Lowenbrau"))  && (!InStr(item, "MusicToken"))  && (!InStr(item, "Floppy"))
+                       ClearText()
+                       Print("Room " + roomNum + " " + room)
+                       Print("Checking " + item)
+                       if RemoteFunctionCall(Connect(item), "HasFunction",temp)
+                           Append(computers, item)
+                           Print(item)
+                       end
+                   end
+               end
+           end
+           if saveRoom
+               Print("Saving Room " + roomNum)
+               SaveMemoryPlus("Room" + roomNum + "Computers", computers)
+               computers = []
+               saveRoom = false
+           end
+       end
+       Print("Saved Computers for " + roomNum + " rooms.")
+       return
+   end
+   if ToLower(arg) == "rooms" || ToLower(arg) == "room"
+       loop RemoteFunctionCall(Connect("MainFrame"), "GetAllRooms", args)
+           if InStr(ToLower(@), "inventory") == false && InStr(ToLower(@), "locker")  == false
+               Print(@)
+           end
+       end
+       return
+   end
    Append(args, arg)
-   if !id > -1
-       id = Connect("MainFrame")
-   end 
-   loop RemoteFunctionCall(id, "GetThingsOfType", args)
+   loop RemoteFunctionCall(Connect("MainFrame"), "GetThingsOfType", args)
        Print(@)
    end
+end
+
+var RFC(array args)
+   array arg = []
+   var target = ""
+   var cmd = ""
+   if Count(args) > 0
+       target = args[0]
+       if Count(args) > 1
+           cmd = args[1]
+       else
+           return
+       end
+       if Count(args) > 2
+           loop i from 2 to Count(args) - 1
+               Append(arg, args[i])
+           end
+       end
+   else
+       return
+   end
+   Print("Running " + cmd + " on " + target)
+   return RemoteFunctionCall(Connect(target), cmd, arg)
+end
+
+void SaveMemoryPlus(string key, var value)
+    string type = Type(value)
+    if type == "array"
+        SaveMemoryArray(key, value)
+    else if type == "unknown"
+        # only "unknown" type known is automatic array index,
+        # so we cast it as number (if not, error)
+        number aux = value
+        SaveMemory(key, aux)
+    else
+        SaveMemory(key, value)
+    end
+end
+
+var LoadMemoryPlus(string key)
+    var value = LoadMemory(key)
+    if value == IntToChar(64)
+        return LoadMemoryArray(key)
+    else
+        return value
+    end
+end
+
+void EraseMemoryPlus(string key)
+    if HasMemory(key)
+        if LoadMemory(key) == IntToChar(64)
+            EraseMemoryArray(key)
+        else
+            EraseMemory(key)
+        end
+    end
+end
+
+void SaveMemoryArray(string key, array a)
+    EraseMemoryPlus(key)
+    string subKey = IntToChar(64) + key + IntToChar(64)
+    SaveMemory(key, IntToChar(64))
+    number i = 0
+    loop GetIndexes(a)
+        SaveMemoryPlus(subKey + "k" + i, @)
+        SaveMemoryPlus(subKey + "v" + i, a[@])
+        i++
+    end
+end
+
+array LoadMemoryArray(string key)
+    string subKey = IntToChar(64) + key + IntToChar(64)
+    array result = []
+    number i = 0
+    loop
+        if !HasMemory(subKey + "k" + i)
+            break
+        end
+        
+        # no need of LoadMemoryPlus 'cause key can't be array
+        var key = LoadMemory(subKey + "k" + i)
+        var value = LoadMemoryPlus(subKey + "v" + i)
+        
+        result[key] = value
+        i++
+    end
+    return result
+end
+
+void EraseMemoryArray(string key)
+    string subKey = IntToChar(64) + key + IntToChar(64)
+    number i = 0
+    loop
+        if !HasMemory(subKey + "k" + i)
+            break
+        end
+        
+        EraseMemory(subKey + "k" + i)
+        EraseMemoryPlus(subKey + "v" + i)
+
+        i++
+    end    
+end
+
+void test()
+    Print(LoadMemoryPlus("Computers"))
 end
